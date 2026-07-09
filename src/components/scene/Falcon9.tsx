@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { ROCKET_COMPONENTS, ENGINE_PARTS } from "@/data/rocketData";
 
@@ -15,6 +16,66 @@ function lerp(a: number, b: number, t: number) {
 
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/** Map engine part id → geometry type */
+const PART_GEOMETRY: Record<string, "cylinder" | "sphere" | "cone" | "box" | "torus"> = {
+  "combustion-chamber": "cylinder",
+  "turbopump": "sphere",
+  "nozzle": "cone",
+  "gas-generator": "box",
+  "thrust-frame": "torus",
+};
+
+/** Pre-built geometry elements for each part type */
+function PartMesh({
+  type,
+  color,
+  emissive,
+  emissiveIntensity,
+}: {
+  type: "cylinder" | "sphere" | "cone" | "box" | "torus";
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+}) {
+  switch (type) {
+    case "cylinder":
+      return (
+        <mesh>
+          <cylinderGeometry args={[0.6, 0.6, 1.2, 16]} />
+          <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      );
+    case "sphere":
+      return (
+        <mesh>
+          <sphereGeometry args={[0.7, 16, 16]} />
+          <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      );
+    case "cone":
+      return (
+        <mesh rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.5, 1.5, 16]} />
+          <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      );
+    case "box":
+      return (
+        <mesh>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      );
+    case "torus":
+      return (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.8, 0.2, 12, 24]} />
+          <meshStandardMaterial color={color} metalness={0.7} roughness={0.3} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+        </mesh>
+      );
+  }
 }
 
 function RocketPart({
@@ -80,12 +141,35 @@ function RocketPart({
         />
       </mesh>
 
+      {/* Wireframe overlay for tech look */}
+      <mesh>
+        <cylinderGeometry args={[radius * 1.002, radius * 1.002, h, 16, 4, true]} />
+        <meshBasicMaterial
+          color="#44aaff"
+          wireframe
+          transparent
+          opacity={0.15 * explodeProgress + 0.05}
+        />
+      </mesh>
+
       {/* Fairing has a cone top */}
       {component.id === "fairing" && (
-        <mesh position={[0, h / 2 + 3, 0]} castShadow>
-          <coneGeometry args={[radius, 6, 32]} />
-          <meshStandardMaterial color={component.color} metalness={0.7} roughness={0.3} />
-        </mesh>
+        <>
+          <mesh position={[0, h / 2 + 3, 0]} castShadow>
+            <coneGeometry args={[radius, 6, 32]} />
+            <meshStandardMaterial color={component.color} metalness={0.7} roughness={0.3} />
+          </mesh>
+          {/* Wireframe for fairing cone */}
+          <mesh position={[0, h / 2 + 3, 0]}>
+            <coneGeometry args={[radius * 1.002, 6, 12, 1, true]} />
+            <meshBasicMaterial
+              color="#44aaff"
+              wireframe
+              transparent
+              opacity={0.15 * explodeProgress + 0.05}
+            />
+          </mesh>
+        </>
       )}
 
       {/* Stage1 has engine cluster at bottom */}
@@ -150,6 +234,18 @@ export function Falcon9({ explodeProgress, selectedPart, onSelectPart }: Falcon9
     }
   });
 
+  // Engine part explosion: center is the stage1 engine cluster area
+  const engineCenterY = -14 - 41.2 / 2 - 2; // stage1 pos + half height + engine offset
+
+  // Scatter directions: 5 parts spread radially around Y axis, each with different Y offset
+  const scatterConfigs = useMemo(() => [
+    { angle: 0, yOff: 2, zOff: 0 },      // combustion chamber — forward
+    { angle: Math.PI * 2 / 5, yOff: -1, zOff: 2.5 }, // turbopump — right-down
+    { angle: Math.PI * 4 / 5, yOff: -3, zOff: 0 },   // nozzle — down
+    { angle: Math.PI * 6 / 5, yOff: -1, zOff: -2.5 }, // gas generator — left-down
+    { angle: Math.PI * 8 / 5, yOff: 1.5, zOff: -2 },  // thrust frame — back-up
+  ], []);
+
   return (
     <group ref={groupRef}>
       {ROCKET_COMPONENTS.map((comp) => (
@@ -164,38 +260,92 @@ export function Falcon9({ explodeProgress, selectedPart, onSelectPart }: Falcon9
         />
       ))}
 
-      {/* Engine parts (visible when stage1 is selected and exploded) */}
-      {explodeProgress > 0.3 &&
+      {/* Engine parts: explode from stage1 bottom when stage1 is selected */}
+      {explodeProgress > 0.5 &&
         selectedPart === "stage1" &&
-        ENGINE_PARTS.map((part) => {
-          const partY = -25 + part.explodeOffset[1] * explodeProgress * 3;
-          const partX = part.explodeOffset[0] * explodeProgress * 3;
-          const partZ = part.explodeOffset[2] * explodeProgress * 3;
+        ENGINE_PARTS.map((part, idx) => {
+          const cfg = scatterConfigs[idx % scatterConfigs.length];
+          const progress = easeInOutCubic(Math.min((explodeProgress - 0.5) / 0.3, 1));
+          const spreadRadius = 4 + progress * 8;
+          const x = Math.cos(cfg.angle) * spreadRadius;
+          const z = Math.sin(cfg.angle) * spreadRadius;
+          const y = engineCenterY + cfg.yOff * progress * 2 + cfg.zOff * progress;
+          const partCenter = new THREE.Vector3(x, y, z);
+          const origin = new THREE.Vector3(0, engineCenterY, 0);
+
+          const geomType = PART_GEOMETRY[part.id] || "box";
+          const isSelected = selectedPart === part.id;
+
           return (
-            <mesh
-              key={part.id}
-              position={[partX, partY, partZ]}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectPart(part.id);
-              }}
-              onPointerOver={(e) => {
-                e.stopPropagation();
-                document.body.style.cursor = "pointer";
-              }}
-              onPointerOut={() => {
-                document.body.style.cursor = "default";
-              }}
-            >
-              <boxGeometry args={[1.5, 1.5, 1.5]} />
-              <meshStandardMaterial
-                color={part.color}
-                metalness={0.6}
-                roughness={0.4}
-                emissive={selectedPart === part.id ? part.color : "#000000"}
-                emissiveIntensity={selectedPart === part.id ? 0.5 : 0}
+            <group key={part.id}>
+              {/* Connection line back to engine center */}
+              <Line
+                points={[
+                  [origin.x, origin.y, origin.z],
+                  [partCenter.x, partCenter.y, partCenter.z],
+                ]}
+                color="#44aaff"
+                transparent
+                opacity={Math.min(0.3 * progress, 0.3)}
+                lineWidth={1}
               />
-            </mesh>
+
+              {/* The part mesh */}
+              <group
+                position={[x, y, z]}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectPart(isSelected ? null : part.id);
+                }}
+                onPointerOver={(e) => {
+                  e.stopPropagation();
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "default";
+                }}
+              >
+                <PartMesh
+                  type={geomType}
+                  color={part.color}
+                  emissive={isSelected ? part.color : "#000000"}
+                  emissiveIntensity={isSelected ? 0.5 : 0}
+                />
+
+                {/* Hover glow ring */}
+                <mesh>
+                  <ringGeometry args={[1, 1.3, 24]} />
+                  <meshBasicMaterial
+                    color="#44aaff"
+                    transparent
+                    opacity={isSelected ? 0.4 : 0.15}
+                    side={THREE.DoubleSide}
+                  />
+                </mesh>
+
+                {/* Label (visible when explosion is well underway) */}
+                {explodeProgress > 0.7 && (
+                  <Html distanceFactor={30} center>
+                    <div
+                      style={{
+                        background: "rgba(0, 10, 30, 0.85)",
+                        border: "1px solid rgba(68, 170, 255, 0.5)",
+                        borderRadius: "6px",
+                        padding: "4px 10px",
+                        color: "#e0e8ff",
+                        fontSize: "12px",
+                        fontFamily: "monospace",
+                        whiteSpace: "nowrap",
+                        pointerEvents: "none",
+                        backdropFilter: "blur(4px)",
+                      }}
+                    >
+                      {part.nameEn}
+                    </div>
+                  </Html>
+                )}
+              </group>
+            </group>
           );
         })}
     </group>
