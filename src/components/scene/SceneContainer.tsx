@@ -1,6 +1,6 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Environment } from "@react-three/drei";
+import { CameraControls, Environment } from "@react-three/drei";
 import { StarField } from "./StarField";
 import { OverviewScene } from "./OverviewScene";
 import { OctawebScene } from "./OctawebScene";
@@ -70,17 +70,28 @@ export function SceneContainer({
   onOverviewClick: () => void;
   onOctawebClick: () => void;
 }) {
-  // Camera positions per mode
-  const cameraPos: [number, number, number] =
-    mode === "overview" ? [0, 0, 4] : mode === "octaweb" ? [0.5, 0.5, 1.2] : [2.0, 0.75, 2.5];
+  const cameraRef = useRef<React.ElementRef<typeof CameraControls>>(null);
+
+  const cameraPositions: Record<SceneMode, [number, number, number]> = {
+    overview: [0, 0, 4],
+    octaweb: [0.5, 0.5, 1.2],
+    engine: [2.0, 0.75, 2.5],
+  };
+
+  useEffect(() => {
+    const cam = cameraRef.current;
+    if (!cam) return;
+    const [cx, cy, cz] = cameraPositions[mode];
+    cam.setLookAt(cx, cy, cz, 0, 0, 0, true);
+  }, [mode]);
 
   return (
     <Canvas
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
       onPointerMissed={() => onSelectPart("")}
+      camera={{ fov: 45, position: [0, 0, 4] }}
     >
-      <PerspectiveCamera makeDefault position={cameraPos} fov={45} />
       <Suspense fallback={null}>
         <SceneContent
           mode={mode}
@@ -93,14 +104,11 @@ export function SceneContainer({
         />
         <Environment preset="night" />
       </Suspense>
-      <OrbitControls
-        enablePan={false}
-        enableZoom={true}
+      <CameraControls
+        ref={cameraRef}
+        makeDefault
         minDistance={0.5}
         maxDistance={8}
-        autoRotate={false}
-        enableDamping
-        dampingFactor={0.08}
       />
     </Canvas>
   );
