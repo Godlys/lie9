@@ -1,160 +1,218 @@
-export interface RocketComponent {
-  id: string;
-  name: string;
-  nameEn: string;
-  description: string;
-  specs: { label: string; value: string }[];
-  explodeOffset: [number, number, number];
-  position: [number, number, number];
-  color: string;
-}
-
 export interface EnginePart {
   id: string;
   name: string;
   nameEn: string;
   description: string;
   specs: { label: string; value: string }[];
-  explodeOffset: [number, number, number];
-  position: [number, number, number];
+  /** position when assembled (relative to engine center) */
+  assembledPos: [number, number, number];
+  /** position when exploded */
+  explodedPos: [number, number, number];
+  /** material color */
   color: string;
+  metalness: number;
+  roughness: number;
+  /** geometry type for procedural rendering */
+  geometry: "lathe" | "cylinder" | "torus" | "box" | "sphere" | "cone";
+  /** lathe profile points [radius, y] for lathe geometry */
+  profile?: [number, number][];
 }
 
-export const ROCKET_SPECS = {
-  totalHeight: 70,
-  diameter: 3.7,
-  thrust: "7,607 kN",
-  stages: 2,
-} as const;
-
-export const ROCKET_COMPONENTS: RocketComponent[] = [
-  {
-    id: "fairing",
-    name: "整流罩",
-    nameEn: "Payload Fairing",
-    description: "保护有效载荷在大气层内不受气动加热和压力影响，在上升阶段分离抛弃。",
-    specs: [
-      { label: "高度", value: "13.1 m" },
-      { label: "直径", value: "3.7 m" },
-      { label: "材质", value: "碳纤维/铝蜂窝复合材料" },
-    ],
-    position: [0, 28, 0],
-    explodeOffset: [0, 12, 0],
-    color: "#e8e8e8",
-  },
-  {
-    id: "stage2",
-    name: "二级火箭",
-    nameEn: "Second Stage",
-    description: "配备单台 Merlin 1D Vacuum 发动机，负责将载荷送入最终轨道。",
-    specs: [
-      { label: "高度", value: "14.8 m" },
-      { label: "直径", value: "3.7 m" },
-      { label: "发动机", value: "1 × Merlin 1D Vacuum" },
-      { label: "推力", value: "934 kN (真空)" },
-      { label: "推进剂", value: "液氧/煤油 (LOX/RP-1)" },
-    ],
-    position: [0, 14, 0],
-    explodeOffset: [0, 6, 0],
-    color: "#e8e8e8",
-  },
-  {
-    id: "stage1",
-    name: "一级火箭",
-    nameEn: "First Stage",
-    description: "配备9台 Merlin 1D 发动机，提供起飞推力，可回收复用。",
-    specs: [
-      { label: "高度", value: "41.2 m" },
-      { label: "直径", value: "3.7 m" },
-      { label: "发动机", value: "9 × Merlin 1D" },
-      { label: "推力", value: "7,607 kN (海平面)" },
-      { label: "推进剂", value: "液氧/煤油 (LOX/RP-1)" },
-      { label: "可回收", value: "是" },
-    ],
-    position: [0, -14, 0],
-    explodeOffset: [0, -8, 0],
-    color: "#e8e8e8",
-  },
+const nozzleProfile: [number, number][] = [
+  [0.02, 0],
+  [0.08, 0.02],
+  [0.12, 0.06],
+  [0.14, 0.12],
+  [0.13, 0.18],
+  [0.10, 0.24],
+  [0.06, 0.28],
+  [0.035, 0.30],
+  [0.03, 0.32],
 ];
 
-export const ENGINE_PARTS: EnginePart[] = [
+const chamberProfile: [number, number][] = [
+  [0.03, 0],
+  [0.035, 0.02],
+  [0.05, 0.04],
+  [0.06, 0.06],
+  [0.06, 0.20],
+  [0.055, 0.22],
+  [0.05, 0.24],
+  [0.035, 0.26],
+  [0.035, 0.28],
+];
+
+const injectorProfile: [number, number][] = [
+  [0, 0],
+  [0.06, 0],
+  [0.06, 0.015],
+  [0.055, 0.02],
+  [0.04, 0.022],
+  [0, 0.022],
+];
+
+export const MERLIN_ENGINE_PARTS: EnginePart[] = [
+  {
+    id: "nozzle",
+    name: "喷管",
+    nameEn: "Nozzle",
+    description: "Laval 收扩喷管，将高温高压燃气膨胀加速至超音速。再生冷却通道嵌入管壁。",
+    specs: [
+      { label: "类型", value: "Laval (收扩)" },
+      { label: "喉径", value: "0.27 m" },
+      { label: "出口径", value: "0.91 m" },
+      { label: "面积比", value: "16:1" },
+      { label: "冷却", value: "再生冷却" },
+    ],
+    assembledPos: [0, -0.35, 0],
+    explodedPos: [0, -1.2, 0],
+    color: "#3a3a44",
+    metalness: 0.9,
+    roughness: 0.35,
+    geometry: "lathe",
+    profile: nozzleProfile,
+  },
   {
     id: "combustion-chamber",
     name: "燃烧室",
     nameEn: "Combustion Chamber",
-    description: "推进剂在此混合燃烧，产生高温高压气体驱动火箭飞行。",
+    description: "推进剂在室压 9.7 MPa 下混合燃烧，温度达 3,300°C。镍基合金壁内嵌再生冷却通道。",
     specs: [
       { label: "室压", value: "9.7 MPa" },
-      { label: "温度", value: "~3,300°C" },
-      { label: "材料", value: "镍基合金 + 再生冷却" },
+      { label: "温度", value: "3,300°C" },
+      { label: "材料", value: "镍基合金" },
+      { label: "冷却", value: "再生冷却" },
     ],
-    position: [0, 0, 0],
-    explodeOffset: [0, 1.5, 0],
-    color: "#cc4422",
+    assembledPos: [0, 0, 0],
+    explodedPos: [0, 0.3, 0],
+    color: "#8b3a2a",
+    metalness: 0.7,
+    roughness: 0.4,
+    geometry: "lathe",
+    profile: chamberProfile,
+  },
+  {
+    id: "injector",
+    name: "喷注器",
+    nameEn: "Injector",
+    description: "多孔平板喷注器，中心+外圈孔阵精确控制燃料与氧化剂的混合比例和分布。",
+    specs: [
+      { label: "类型", value: "多孔平板" },
+      { label: "孔数", value: "~1,000+" },
+      { label: "混合比", value: "2.36 (O/F)" },
+    ],
+    assembledPos: [0, 0.15, 0],
+    explodedPos: [0, 0.7, 0],
+    color: "#c0c0c8",
+    metalness: 0.85,
+    roughness: 0.25,
+    geometry: "lathe",
+    profile: injectorProfile,
   },
   {
     id: "turbopump",
     name: "涡轮泵",
     nameEn: "Turbopump",
-    description: "将推进剂从储箱高压输送至燃烧室，单台功率约 3,600 kW。",
+    description: "双级离心泵 + 单级涡轮，功率 3,600 kW，转速 36,000 RPM。燃料泵与氧化剂泵同轴驱动。",
     specs: [
       { label: "功率", value: "3,600 kW" },
       { label: "转速", value: "36,000 RPM" },
       { label: "燃料流量", value: "85 kg/s" },
+      { label: "氧化剂流量", value: "201 kg/s" },
     ],
-    position: [0, 0, 0],
-    explodeOffset: [2, 0, 0],
-    color: "#4488cc",
-  },
-  {
-    id: "nozzle",
-    name: "喷管",
-    nameEn: "Nozzle",
-    description: "拉瓦尔喷管，将高温气体膨胀加速至超音速，产生推力。",
-    specs: [
-      { label: "类型", value: "拉瓦尔 (Laval)" },
-      { label: "喉径", value: "~0.3 m" },
-      { label: "出口径", value: "~1.2 m" },
-      { label: "面积比", value: "16:1 (海平面)" },
-    ],
-    position: [0, 0, 0],
-    explodeOffset: [0, -2, 0],
-    color: "#666666",
+    assembledPos: [0.08, 0.05, 0],
+    explodedPos: [0.6, 0.1, 0],
+    color: "#4a6fa5",
+    metalness: 0.8,
+    roughness: 0.3,
+    geometry: "sphere",
   },
   {
     id: "gas-generator",
     name: "燃气发生器",
     nameEn: "Gas Generator",
-    description: "通过少量推进剂燃烧产生燃气驱动涡轮泵，采用富燃循环。",
+    description: "富燃开式循环，少量推进剂燃烧产生燃气驱动涡轮。排气温度约 650°C。",
     specs: [
-      { label: "循环方式", value: "富燃开式循环" },
-      { label: "燃气温度", value: "~650°C" },
+      { label: "循环方式", value: "富燃开式" },
+      { label: "燃气温度", value: "650°C" },
+      { label: "流量占比", value: "~3%" },
     ],
-    position: [0, 0, 0],
-    explodeOffset: [-2, 0, 0],
-    color: "#88aa44",
+    assembledPos: [-0.08, 0.05, 0],
+    explodedPos: [-0.55, 0.15, 0],
+    color: "#6a8a4a",
+    metalness: 0.75,
+    roughness: 0.35,
+    geometry: "cylinder",
   },
   {
     id: "thrust-frame",
     name: "推力架",
     nameEn: "Thrust Frame",
-    description: "将发动机推力传递至箭体结构的承力框架，9台发动机呈九宫格排列。",
+    description: "锥形承力结构，将发动机推力传递至箭体。Octaweb 布局容纳 9 台发动机。",
     specs: [
-      { label: "布局", value: "Octaweb (9台)" },
+      { label: "布局", value: "Octaweb" },
       { label: "材料", value: "钛合金/钢" },
+      { label: "数量", value: "9台 (一级)" },
     ],
-    position: [0, 0, 0],
-    explodeOffset: [0, -3.5, 0],
-    color: "#888888",
+    assembledPos: [0, 0.25, 0],
+    explodedPos: [0, 1.0, 0],
+    color: "#5a5a64",
+    metalness: 0.7,
+    roughness: 0.45,
+    geometry: "torus",
+  },
+  {
+    id: "valves",
+    name: "阀门组件",
+    nameEn: "Valve Assembly",
+    description: "主阀、泄压阀、节流阀。机电驱动，响应时间 < 10ms。控制推进剂供给和发动机节流。",
+    specs: [
+      { label: "类型", value: "机电球阀" },
+      { label: "响应", value: "< 10ms" },
+      { label: "节流范围", value: "40%-100%" },
+    ],
+    assembledPos: [0.05, -0.1, 0.05],
+    explodedPos: [0.4, -0.4, 0.3],
+    color: "#8a6a3a",
+    metalness: 0.8,
+    roughness: 0.3,
+    geometry: "box",
+  },
+  {
+    id: "igniter",
+    name: "点火器",
+    nameEn: "Igniter",
+    description: "位于喷注器中心，TEB/TEA 化学点火。双冗余设计确保可靠点火。",
+    specs: [
+      { label: "类型", value: "TEB/TEA 化学" },
+      { label: "冗余", value: "双冗余" },
+      { label: "位置", value: "喷注器中心" },
+    ],
+    assembledPos: [0, 0.14, 0],
+    explodedPos: [0, 0.9, 0],
+    color: "#c4a030",
+    metalness: 0.6,
+    roughness: 0.4,
+    geometry: "sphere",
   },
 ];
 
 export const MERLIN_SPECS = {
   name: "Merlin 1D",
+  fullName: "Merlin 1D + MVac",
   thrustSea: "845 kN",
   thrustVacuum: "981 kN",
-  isp: "282s (海平面) / 311s (真空)",
+  isp: "282s / 311s",
   weight: "470 kg",
   thrustWeight: "179.8",
   chamberPressure: "9.7 MPa",
+} as const;
+
+export const FALCON9_SPECS = {
+  height: "70 m",
+  diameter: "3.7 m",
+  thrust: "7,607 kN",
+  stages: 2,
+  enginesStage1: 9,
+  enginesStage2: 1,
 } as const;

@@ -1,64 +1,95 @@
-import { RocketScene } from "@/components/scene/RocketScene";
-import { Controls } from "@/components/ui/Controls";
-import { InfoPanel } from "@/components/ui/InfoPanel";
-import { useExplodeState } from "@/hooks/useExplodeState";
-import { ROCKET_SPECS } from "@/data/rocketData";
+import { useState, useEffect } from "react";
+import { SceneContainer } from "./components/scene/SceneContainer";
+import { InfoPanel } from "./components/ui/InfoPanel";
+import { Breadcrumb } from "./components/ui/Breadcrumb";
+import { HUD } from "./components/ui/HUD";
+import { LoadingScreen } from "./components/ui/LoadingScreen";
+import { useSceneState } from "./hooks/useSceneState";
+import type { SceneMode } from "./hooks/useSceneState";
+
+const MODE_HINTS: Record<SceneMode, string> = {
+  overview: "点击火箭底部发动机区域 → 进入 Octaweb 阵列",
+  octaweb: "点击任意发动机 → 查看 Merlin 1D 爆炸拆解图",
+  engine: "点击零件查看详情 · 拖拽旋转 · 滚轮缩放",
+};
 
 export default function App() {
   const {
+    mode,
     explodeProgress,
-    isExploding,
     selectedPart,
+    loading,
+    setLoading,
     setSelectedPart,
-    assemble,
-    toggle,
-  } = useExplodeState();
+    goToOverview,
+    goToOctaweb,
+    goToEngine,
+    toggleExplode,
+  } = useSceneState();
 
-  const handleReset = () => {
-    assemble();
+  const [cameraTransition, setCameraTransition] = useState(false);
+
+  useEffect(() => {
+    setCameraTransition(true);
+    const t = setTimeout(() => setCameraTransition(false), 600);
+    return () => clearTimeout(t);
+  }, [mode]);
+
+  const handleNavigate = (target: SceneMode) => {
+    if (target === "overview") goToOverview();
+    else if (target === "octaweb") goToOctaweb();
+    else goToEngine();
   };
 
   return (
-    <div className="w-screen h-screen relative overflow-hidden bg-[#000511]">
+    <div
+      className="relative h-screen w-screen overflow-hidden"
+      style={{
+        background: "radial-gradient(ellipse at center, #0f0f18 0%, #0a0a0f 60%, #050508 100%)",
+        opacity: cameraTransition ? 0.6 : 1,
+        transition: "opacity 600ms ease",
+      }}
+    >
+      {loading && <LoadingScreen onDone={() => setLoading(false)} />}
+
       {/* 3D Scene */}
-      <RocketScene
+      <SceneContainer
+        mode={mode}
         explodeProgress={explodeProgress}
         selectedPart={selectedPart}
-        onSelectPart={setSelectedPart}
+        onSelectPart={(id) => setSelectedPart(id || null)}
+        onOverviewClick={goToOctaweb}
+        onOctawebClick={goToEngine}
       />
 
-      {/* Top bar */}
-      <div className="fixed top-0 left-0 right-0 z-10 p-6 flex justify-between items-start pointer-events-none">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            LIE9
-          </h1>
-          <p className="text-sm text-white/50 tracking-widest uppercase mt-1">
-            Falcon 9 Explosive View
-          </p>
-        </div>
-        <div className="text-right text-white/40 text-xs space-y-1">
-          <p>Height: {ROCKET_SPECS.totalHeight}m</p>
-          <p>Diameter: {ROCKET_SPECS.diameter}m</p>
-          <p>Thrust: {ROCKET_SPECS.thrust}</p>
-        </div>
-      </div>
+      {/* UI Layer */}
+      <Breadcrumb mode={mode} onNavigate={handleNavigate} />
+      <HUD mode={mode} info={MODE_HINTS[mode]} />
+      <InfoPanel selectedPart={selectedPart} mode={mode} />
 
-      {/* Controls */}
-      <Controls
-        isExploding={isExploding}
-        onToggle={toggle}
-        onReset={handleReset}
-      />
+      {/* Explode toggle (engine mode only) */}
+      {mode === "engine" && (
+        <button
+          onClick={toggleExplode}
+          className="glass glass-accent fixed bottom-6 left-1/2 z-20 -translate-x-1/2 px-6 py-3 font-mono text-sm text-white transition-all hover:scale-105"
+          style={{ borderRadius: "12px" }}
+        >
+          {explodeProgress > 0.5 ? "▣ 组装" : "↕ 爆炸拆解"}
+        </button>
+      )}
 
-      {/* Info Panel */}
-      <InfoPanel selectedPart={selectedPart} onClose={() => setSelectedPart(null)} />
-
-      {/* Hint when idle */}
-      {!isExploding && !selectedPart && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 text-white/30 text-sm tracking-wide pointer-events-none">
-          Click EXPLODE to disassemble • Drag to rotate • Click parts for details
-        </div>
+      {/* Back button (when not overview) */}
+      {mode !== "overview" && (
+        <button
+          onClick={() => {
+            if (mode === "engine") goToOctaweb();
+            else goToOverview();
+          }}
+          className="glass fixed left-6 bottom-6 z-20 px-4 py-2 font-mono text-xs text-zinc-400 transition-all hover:text-white"
+          style={{ borderRadius: "12px" }}
+        >
+          ← 返回
+        </button>
       )}
     </div>
   );
