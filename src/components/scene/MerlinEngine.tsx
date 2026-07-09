@@ -137,7 +137,47 @@ function PartMesh({
           <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.4} />
         </mesh>
       )}
+
+      {/* Nozzle structural stiffener rings */}
+      {part.id === 'nozzle' && <NozzleStiffeners />}
     </group>
+  );
+}
+
+// ─────────────────────────────────────────────
+// NozzleStiffeners – 5 torus rings reinforcing the nozzle
+// ─────────────────────────────────────────────
+
+function NozzleStiffeners() {
+  // Y heights (relative to nozzle group) and corresponding outer radii
+  // sampled from the refined nozzleProfile, plus a small offset
+  const rings = useMemo<
+    { y: number; radius: number; tubeRadius: number }[]
+  >(() => [
+    { y: 0.05, radius: 0.19, tubeRadius: 0.007 },
+    { y: 0.22, radius: 0.338, tubeRadius: 0.006 },
+    { y: 0.38, radius: 0.343, tubeRadius: 0.006 },
+    { y: 0.54, radius: 0.263, tubeRadius: 0.007 },
+    { y: 0.70, radius: 0.148, tubeRadius: 0.006 },
+  ], []);
+
+  return (
+    <>
+      {rings.map((ring, i) => (
+        <mesh
+          key={i}
+          position={[0, ring.y, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <torusGeometry args={[ring.radius, ring.tubeRadius, 12, 48]} />
+          <meshPhysicalMaterial
+            color="#4a4a54"
+            metalness={0.8}
+            roughness={0.4}
+          />
+        </mesh>
+      ))}
+    </>
   );
 }
 

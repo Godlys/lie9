@@ -19,16 +19,27 @@ export interface EnginePart {
 }
 
 // Scaled 2.5x from original for better visibility
+// Refined from 9 → 19 points for smoother throat convergence/divergence transition
 const nozzleProfile: [number, number][] = [
-  [0.05, 0],
-  [0.20, 0.05],
-  [0.30, 0.15],
-  [0.35, 0.30],
-  [0.33, 0.45],
-  [0.25, 0.60],
-  [0.15, 0.70],
-  [0.09, 0.75],
-  [0.075, 0.80],
+  [0.05, 0],       // exit lip
+  [0.08, 0.01],
+  [0.14, 0.03],
+  [0.21, 0.06],
+  [0.27, 0.11],
+  [0.31, 0.17],
+  [0.33, 0.22],
+  [0.343, 0.26],   // approaching throat outer bulge
+  [0.35, 0.30],    // throat outer bulge (max radius)
+  [0.347, 0.34],   // post-throat transition
+  [0.335, 0.38],
+  [0.31, 0.43],
+  [0.28, 0.49],
+  [0.24, 0.56],
+  [0.20, 0.62],
+  [0.16, 0.67],
+  [0.125, 0.72],
+  [0.095, 0.76],
+  [0.075, 0.80],   // top – connects to combustion chamber
 ];
 
 const chamberProfile: [number, number][] = [
