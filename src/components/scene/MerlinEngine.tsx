@@ -1,8 +1,9 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Html, Line } from "@react-three/drei";
+import { Line } from "@react-three/drei";
 import type { EnginePart } from "../../data/rocketData";
+import AnnotationLine from "../ui/AnnotationLine";
 
 // Clipping plane for engine cutaway view during simulation
 const CLIP_PLANE = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
@@ -134,26 +135,6 @@ function PartMesh({
         <mesh geometry={geometry} scale={1.05}>
           <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.4} />
         </mesh>
-      )}
-      {/* Chinese label - small & subtle, hidden during simulation */}
-      {!simulating && (
-        <Html
-          position={[0, 0.22, 0]}
-          center
-          style={{
-            color: selected ? "#ff3b30" : "rgba(255,255,255,0.55)",
-            fontSize: "10px",
-            fontWeight: selected ? "bold" : "normal",
-            whiteSpace: "nowrap",
-            textShadow: "0 0 4px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9)",
-            pointerEvents: "none",
-            userSelect: "none",
-            fontFamily: "'Geist', 'Noto Sans SC', sans-serif",
-            letterSpacing: "0.05em",
-          }}
-        >
-          {part.name}
-        </Html>
       )}
     </group>
   );
@@ -448,6 +429,17 @@ export function MerlinEngine({
           onClick={() => onSelectPart(part.id)}
         />
       ))}
+      {/* Annotation lines when exploded enough and not simulating */}
+      {explodeProgress > 0.5 &&
+        !simulating &&
+        parts.map((part, idx) => (
+          <AnnotationLine
+            key={part.id}
+            position={part.explodedPos}
+            name={part.name}
+            index={idx + 1}
+          />
+        ))}
       <EngineFlame active={simulating} />
       <IgnitionSpark active={simulating} />
       {/* Simulated inner glow from combustion chamber visible through nozzle */}
