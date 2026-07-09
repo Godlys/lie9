@@ -1,6 +1,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { Html, Line } from "@react-three/drei";
 import type { EnginePart } from "../../data/rocketData";
 
 function PartMesh({
@@ -76,7 +77,75 @@ function PartMesh({
           <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.4} />
         </mesh>
       )}
+      {/* Chinese label using Drei Html */}
+      <Html
+        position={[0, 0.14, 0]}
+        center
+        style={{
+          color: selected ? "#ff3b30" : "#ffffff",
+          fontSize: "11px",
+          fontWeight: "bold",
+          whiteSpace: "nowrap",
+          textShadow: "0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)",
+          pointerEvents: "none",
+          userSelect: "none",
+          fontFamily: "'Noto Sans SC', sans-serif",
+        }}
+      >
+        {part.name}
+      </Html>
     </group>
+  );
+}
+
+/**
+ * Dynamic pipe connecting turbopump ⇢ gas generator.
+ * Positions update every frame via useFrame so the line
+ * follows the parts during explode / assemble animation.
+ */
+function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgress: number }) {
+  const lineRef = useRef<any>(null);
+
+  const tp = parts.find((p) => p.id === "turbopump")!;
+  const gg = parts.find((p) => p.id === "gas-generator")!;
+
+  useFrame(() => {
+    if (!lineRef.current) return;
+    const pos = lineRef.current.geometry.attributes.position;
+    // turbopump end
+    pos.setXYZ(
+      0,
+      THREE.MathUtils.lerp(tp.assembledPos[0], tp.explodedPos[0], explodeProgress),
+      THREE.MathUtils.lerp(tp.assembledPos[1], tp.explodedPos[1], explodeProgress),
+      THREE.MathUtils.lerp(tp.assembledPos[2], tp.explodedPos[2], explodeProgress),
+    );
+    // gas-generator end
+    pos.setXYZ(
+      1,
+      THREE.MathUtils.lerp(gg.assembledPos[0], gg.explodedPos[0], explodeProgress),
+      THREE.MathUtils.lerp(gg.assembledPos[1], gg.explodedPos[1], explodeProgress),
+      THREE.MathUtils.lerp(gg.assembledPos[2], gg.explodedPos[2], explodeProgress),
+    );
+    pos.needsUpdate = true;
+  });
+
+  const points = useMemo(
+    () => [
+      new THREE.Vector3(tp.assembledPos[0], tp.assembledPos[1], tp.assembledPos[2]),
+      new THREE.Vector3(gg.assembledPos[0], gg.assembledPos[1], gg.assembledPos[2]),
+    ],
+    [tp, gg],
+  );
+
+  return (
+    <Line
+      ref={lineRef}
+      points={points}
+      color="#ff6600"
+      lineWidth={1}
+      transparent
+      opacity={0.6}
+    />
   );
 }
 
@@ -101,6 +170,7 @@ export function MerlinEngine({
 
   return (
     <group ref={groupRef}>
+      <Pipes parts={parts} explodeProgress={explodeProgress} />
       {parts.map((part) => (
         <PartMesh
           key={part.id}
