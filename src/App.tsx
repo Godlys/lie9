@@ -20,12 +20,14 @@ export default function App() {
     explodeProgress,
     selectedPart,
     loading,
+    simulating,
     setLoading,
     setSelectedPart,
     goToOverview,
     goToOctaweb,
     goToEngine,
     toggleExplode,
+    toggleSimulate,
   } = useSceneState();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,7 +35,6 @@ export default function App() {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    // Skip animation on initial mount
     if (prevMode.current === null) {
       prevMode.current = mode;
       return;
@@ -80,6 +81,7 @@ export default function App() {
         mode={mode}
         explodeProgress={explodeProgress}
         selectedPart={selectedPart}
+        simulating={simulating}
         onSelectPart={(id) => setSelectedPart(id || null)}
         onOverviewClick={goToOctaweb}
         onOctawebClick={goToEngine}
@@ -87,18 +89,32 @@ export default function App() {
 
       {/* UI Layer */}
       <Breadcrumb mode={mode} onNavigate={handleNavigate} />
-      <HUD mode={mode} info={MODE_HINTS[mode]} />
+      <HUD mode={mode} info={simulating ? "🔥 运行模拟中 — 发动机点火" : MODE_HINTS[mode]} />
       <InfoPanel selectedPart={selectedPart} mode={mode} />
 
-      {/* Explode toggle (engine mode only) */}
+      {/* Engine mode buttons */}
       {mode === "engine" && (
-        <button
-          onClick={toggleExplode}
-          className="glass glass-accent fixed bottom-6 left-1/2 z-20 -translate-x-1/2 px-6 py-3 font-mono text-sm text-white transition-all hover:scale-105"
-          style={{ borderRadius: "12px" }}
-        >
-          {explodeProgress > 0.5 ? "▣ 组装" : "↕ 爆炸拆解"}
-        </button>
+        <div className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-3">
+          <button
+            onClick={toggleExplode}
+            disabled={simulating}
+            className="glass glass-accent px-5 py-3 font-mono text-sm text-white transition-all hover:scale-105 disabled:opacity-30 disabled:hover:scale-100"
+            style={{ borderRadius: "12px" }}
+          >
+            {explodeProgress > 0.5 ? "▣ 组装" : "↕ 爆炸拆解"}
+          </button>
+          <button
+            onClick={toggleSimulate}
+            className={`px-5 py-3 font-mono text-sm transition-all hover:scale-105 ${
+              simulating
+                ? "bg-[#ff3b30] text-white"
+                : "glass text-[#ff3b30]"
+            }`}
+            style={{ borderRadius: "12px" }}
+          >
+            {simulating ? "■ 停止模拟" : "▶ 运行模拟"}
+          </button>
+        </div>
       )}
 
       {/* Back button (when not overview) */}

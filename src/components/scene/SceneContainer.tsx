@@ -12,6 +12,7 @@ function SceneContent({
   mode,
   explodeProgress,
   selectedPart,
+  simulating,
   onSelectPart,
   onOverviewClick,
   onOctawebClick,
@@ -19,6 +20,7 @@ function SceneContent({
   mode: SceneMode;
   explodeProgress: number;
   selectedPart: string | null;
+  simulating: boolean;
   onSelectPart: (id: string) => void;
   onOverviewClick: () => void;
   onOctawebClick: () => void;
@@ -43,6 +45,7 @@ function SceneContent({
           parts={MERLIN_ENGINE_PARTS}
           explodeProgress={explodeProgress}
           selectedPart={selectedPart}
+          simulating={simulating}
           onSelectPart={onSelectPart}
         />
       )}
@@ -54,6 +57,7 @@ export function SceneContainer({
   mode,
   explodeProgress,
   selectedPart,
+  simulating,
   onSelectPart,
   onOverviewClick,
   onOctawebClick,
@@ -61,6 +65,7 @@ export function SceneContainer({
   mode: SceneMode;
   explodeProgress: number;
   selectedPart: string | null;
+  simulating: boolean;
   onSelectPart: (id: string) => void;
   onOverviewClick: () => void;
   onOctawebClick: () => void;
@@ -81,6 +86,7 @@ export function SceneContainer({
           mode={mode}
           explodeProgress={explodeProgress}
           selectedPart={selectedPart}
+          simulating={simulating}
           onSelectPart={onSelectPart}
           onOverviewClick={onOverviewClick}
           onOctawebClick={onOctawebClick}

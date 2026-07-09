@@ -8,11 +8,13 @@ function PartMesh({
   part,
   exploded,
   selected,
+  simulating,
   onClick,
 }: {
   part: EnginePart;
   exploded: number;
   selected: boolean;
+  simulating: boolean;
   onClick: () => void;
 }) {
   const ref = useRef<THREE.Group>(null);
@@ -55,6 +57,9 @@ function PartMesh({
     }
   });
 
+  // Simulating: combustion chamber glows
+  const isHot = simulating && (part.id === "combustion-chamber" || part.id === "nozzle");
+
   return (
     <group ref={ref} position={part.assembledPos}>
       <mesh
@@ -67,8 +72,8 @@ function PartMesh({
           color={part.color}
           metalness={part.metalness}
           roughness={part.roughness}
-          emissive={selected ? "#ff3b30" : "#000000"}
-          emissiveIntensity={selected ? 0.3 : 0}
+          emissive={selected ? "#ff3b30" : isHot ? "#ff6600" : "#000000"}
+          emissiveIntensity={selected ? 0.3 : isHot ? 0.6 : 0}
         />
       </mesh>
       {/* Outline for selected */}
@@ -77,31 +82,32 @@ function PartMesh({
           <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.4} />
         </mesh>
       )}
-      {/* Chinese label using Drei Html */}
-      <Html
-        position={[0, 0.35, 0]}
-        center
-        style={{
-          color: selected ? "#ff3b30" : "#ffffff",
-          fontSize: "13px",
-          fontWeight: "bold",
-          whiteSpace: "nowrap",
-          textShadow: "0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)",
-          pointerEvents: "none",
-          userSelect: "none",
-          fontFamily: "'Noto Sans SC', sans-serif",
-        }}
-      >
-        {part.name}
-      </Html>
+      {/* Chinese label - small & subtle */}
+      {!simulating && (
+        <Html
+          position={[0, 0.22, 0]}
+          center
+          style={{
+            color: selected ? "#ff3b30" : "rgba(255,255,255,0.55)",
+            fontSize: "10px",
+            fontWeight: selected ? "bold" : "normal",
+            whiteSpace: "nowrap",
+            textShadow: "0 0 4px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9)",
+            pointerEvents: "none",
+            userSelect: "none",
+            fontFamily: "'Geist', 'Noto Sans SC', sans-serif",
+            letterSpacing: "0.05em",
+          }}
+        >
+          {part.name}
+        </Html>
+      )}
     </group>
   );
 }
 
 /**
  * Dynamic pipe connecting turbopump ⇢ gas generator.
- * Positions update every frame via useFrame so the line
- * follows the parts during explode / assemble animation.
  */
 function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgress: number }) {
   const lineRef = useRef<any>(null);
@@ -112,14 +118,12 @@ function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgres
   useFrame(() => {
     if (!lineRef.current) return;
     const pos = lineRef.current.geometry.attributes.position;
-    // turbopump end
     pos.setXYZ(
       0,
       THREE.MathUtils.lerp(tp.assembledPos[0], tp.explodedPos[0], explodeProgress),
       THREE.MathUtils.lerp(tp.assembledPos[1], tp.explodedPos[1], explodeProgress),
       THREE.MathUtils.lerp(tp.assembledPos[2], tp.explodedPos[2], explodeProgress),
     );
-    // gas-generator end
     pos.setXYZ(
       1,
       THREE.MathUtils.lerp(gg.assembledPos[0], gg.explodedPos[0], explodeProgress),
@@ -149,22 +153,90 @@ function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgres
   );
 }
 
+/** Engine flame effect for simulation mode */
+function EngineFlame({ active }: { active: boolean }) {
+  const flameRef = useRef<THREE.Mesh>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
+
+  useFrame((state, delta) => {
+    if (!flameRef.current) return;
+    // Flicker
+    const flicker = 1 + Math.sin(state.clock.elapsedTime * 30) * 0.08 + Math.random() * 0.05;
+    flameRef.current.scale.set(flicker, 1 + Math.sin(state.clock.elapsedTime * 20) * 0.12, flicker);
+    flameRef.current.rotation.y += delta * 2;
+
+    if (lightRef.current) {
+      lightRef.current.intensity = 2 + Math.sin(state.clock.elapsedTime * 25) * 0.5;
+    }
+  });
+
+  if (!active) return null;
+
+  return (
+    <group position={[0, -1.1, 0]}>
+      {/* Outer flame plume */}
+      <mesh ref={flameRef} position={[0, -0.4, 0]}>
+        <coneGeometry args={[0.22, 0.9, 32, 1, true]} />
+        <meshBasicMaterial
+          color="#ff4400"
+          transparent
+          opacity={0.4}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Inner core */}
+      <mesh position={[0, -0.3, 0]}>
+        <coneGeometry args={[0.10, 0.5, 32, 1, true]} />
+        <meshBasicMaterial
+          color="#ffdd66"
+          transparent
+          opacity={0.7}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Brightest center */}
+      <mesh position={[0, -0.15, 0]}>
+        <coneGeometry args={[0.04, 0.2, 16, 1, true]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.9}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Dynamic light */}
+      <pointLight ref={lightRef} position={[0, -0.3, 0]} color="#ff6600" intensity={2} distance={4} />
+    </group>
+  );
+}
+
 export function MerlinEngine({
   parts,
   explodeProgress,
   selectedPart,
+  simulating,
   onSelectPart,
 }: {
   parts: EnginePart[];
   explodeProgress: number;
   selectedPart: string | null;
+  simulating: boolean;
   onSelectPart: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.15;
+      // Slow rotation when exploded, stop when simulating
+      if (!simulating) {
+        groupRef.current.rotation.y += delta * 0.15;
+      }
     }
   });
 
@@ -177,9 +249,11 @@ export function MerlinEngine({
           part={part}
           exploded={explodeProgress}
           selected={selectedPart === part.id}
+          simulating={simulating}
           onClick={() => onSelectPart(part.id)}
         />
       ))}
+      <EngineFlame active={simulating} />
     </group>
   );
 }
