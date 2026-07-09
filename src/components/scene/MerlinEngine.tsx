@@ -4,6 +4,10 @@ import * as THREE from "three";
 import { Html, Line } from "@react-three/drei";
 import type { EnginePart } from "../../data/rocketData";
 
+// ─────────────────────────────────────────────
+// PartMesh – individual engine part
+// ─────────────────────────────────────────────
+
 function PartMesh({
   part,
   exploded,
@@ -28,9 +32,9 @@ function PartMesh({
           64,
         );
       case "cylinder":
-        return new THREE.CylinderGeometry(0.10, 0.10, 0.30, 32);
+        return new THREE.CylinderGeometry(0.1, 0.1, 0.3, 32);
       case "torus":
-        return new THREE.TorusGeometry(0.20, 0.05, 16, 48);
+        return new THREE.TorusGeometry(0.2, 0.05, 16, 48);
       case "box":
         return new THREE.BoxGeometry(0.15, 0.15, 0.15);
       case "sphere":
@@ -55,25 +59,63 @@ function PartMesh({
     } else {
       ref.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 8);
     }
+
+    // Turbopump high-speed rotation during simulation
+    if (simulating && part.id === "turbopump") {
+      ref.current.rotation.y += delta * 30;
+    }
   });
 
-  // Simulating: combustion chamber glows
-  const isHot = simulating && (part.id === "combustion-chamber" || part.id === "nozzle");
+  // ── emissive per part type ──────────────────
+  let emissiveColor = "#000000";
+  let emissiveIntensity = 0;
+
+  if (selected) {
+    emissiveColor = "#ff3b30";
+    emissiveIntensity = 0.3;
+  } else if (simulating) {
+    switch (part.id) {
+      case "combustion-chamber":
+        emissiveColor = "#ff2200";
+        emissiveIntensity = 0.8;
+        break;
+      case "nozzle":
+        emissiveColor = "#ff4400";
+        emissiveIntensity = 0.5;
+        break;
+      case "injector":
+        emissiveColor = "#88bbff";
+        emissiveIntensity = 0.5;
+        break;
+      case "gas-generator":
+        emissiveColor = "#ff8800";
+        emissiveIntensity = 0.4;
+        break;
+    }
+  }
 
   return (
     <group ref={ref} position={part.assembledPos}>
       <mesh
         geometry={geometry}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { document.body.style.cursor = "default"; }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "default";
+        }}
       >
         <meshStandardMaterial
           color={part.color}
           metalness={part.metalness}
           roughness={part.roughness}
-          emissive={selected ? "#ff3b30" : isHot ? "#ff6600" : "#000000"}
-          emissiveIntensity={selected ? 0.3 : isHot ? 0.6 : 0}
+          emissive={emissiveColor}
+          emissiveIntensity={emissiveIntensity}
         />
       </mesh>
       {/* Outline for selected */}
@@ -82,7 +124,7 @@ function PartMesh({
           <meshBasicMaterial color="#ff3b30" wireframe transparent opacity={0.4} />
         </mesh>
       )}
-      {/* Chinese label - small & subtle */}
+      {/* Chinese label - small & subtle, hidden during simulation */}
       {!simulating && (
         <Html
           position={[0, 0.22, 0]}
@@ -106,9 +148,10 @@ function PartMesh({
   );
 }
 
-/**
- * Dynamic pipe connecting turbopump ⇢ gas generator.
- */
+// ─────────────────────────────────────────────
+// Pipes – turbopump ⇢ gas generator
+// ─────────────────────────────────────────────
+
 function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgress: number }) {
   const lineRef = useRef<any>(null);
 
@@ -153,18 +196,131 @@ function Pipes({ parts, explodeProgress }: { parts: EnginePart[]; explodeProgres
   );
 }
 
-/** Engine flame effect for simulation mode */
+// ─────────────────────────────────────────────
+// GradientFlameCone – cone with y-gradient opacity
+//    top (tip) = transparent, bottom (base) = opaque
+// ─────────────────────────────────────────────
+
+function GradientFlameCone({
+  color,
+  baseOpacity,
+  radius,
+  height,
+  yOffset = 0,
+}: {
+  color: string;
+  baseOpacity: number;
+  radius: number;
+  height: number;
+  yOffset?: number;
+}) {
+  const geometry = useMemo(
+    () => new THREE.ConeGeometry(radius, height, 32, 1, true),
+    [radius, height],
+  );
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(color) },
+          uHeight: { value: height },
+          uBaseOpacity: { value: baseOpacity },
+        },
+        vertexShader: `
+          uniform float uHeight;
+          varying float vNormalizedY;
+          void main() {
+            // Cone tip at y = height/2, base at y = -height/2
+            // normalized: 0 at tip (top), 1 at base (bottom)
+            vNormalizedY = 0.5 - position.y / uHeight;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uBaseOpacity;
+          varying float vNormalizedY;
+          void main() {
+            float alpha = vNormalizedY * uBaseOpacity;
+            gl_FragColor = vec4(uColor, alpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      }),
+    [color, baseOpacity, height],
+  );
+
+  return <mesh position={[0, yOffset, 0]} geometry={geometry} material={material} />;
+}
+
+// ─────────────────────────────────────────────
+// FlameParticles – spark particles around the plume
+// ─────────────────────────────────────────────
+
+function FlameParticles({ active }: { active: boolean }) {
+  const count = 150;
+  const meshRef = useRef<THREE.Points>(null);
+
+  const geometry = useMemo(() => {
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const r = 0.05 + Math.random() * 0.35;
+      const y = -Math.random() * 1.0;
+      positions[i * 3] = Math.cos(theta) * r;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = Math.sin(theta) * r;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
+
+  useFrame(() => {
+    if (!meshRef.current || !active) return;
+    const pos = meshRef.current.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < count; i++) {
+      pos[i * 3 + 1] += 0.008;
+      if (pos[i * 3 + 1] > 0.1) {
+        const theta = Math.random() * Math.PI * 2;
+        const r = 0.05 + Math.random() * 0.35;
+        pos[i * 3] = Math.cos(theta) * r;
+        pos[i * 3 + 1] = -Math.random() * 1.0;
+        pos[i * 3 + 2] = Math.sin(theta) * r;
+      }
+    }
+    meshRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  if (!active) return null;
+
+  return (
+    <points ref={meshRef} geometry={geometry} position={[0, -1.1, 0]}>
+      <pointsMaterial
+        size={0.018}
+        color="#ff8844"
+        transparent
+        opacity={0.5}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+        sizeAttenuation
+      />
+    </points>
+  );
+}
+
+// ─────────────────────────────────────────────
+// EngineFlame – enhanced plume with gradient cones
+// ─────────────────────────────────────────────
+
 function EngineFlame({ active }: { active: boolean }) {
-  const flameRef = useRef<THREE.Mesh>(null);
   const lightRef = useRef<THREE.PointLight>(null);
 
-  useFrame((state, delta) => {
-    if (!flameRef.current) return;
-    // Flicker
-    const flicker = 1 + Math.sin(state.clock.elapsedTime * 30) * 0.08 + Math.random() * 0.05;
-    flameRef.current.scale.set(flicker, 1 + Math.sin(state.clock.elapsedTime * 20) * 0.12, flicker);
-    flameRef.current.rotation.y += delta * 2;
-
+  useFrame((state) => {
     if (lightRef.current) {
       lightRef.current.intensity = 2 + Math.sin(state.clock.elapsedTime * 25) * 0.5;
     }
@@ -174,45 +330,73 @@ function EngineFlame({ active }: { active: boolean }) {
 
   return (
     <group position={[0, -1.1, 0]}>
-      {/* Outer flame plume */}
-      <mesh ref={flameRef} position={[0, -0.4, 0]}>
-        <coneGeometry args={[0.22, 0.9, 32, 1, true]} />
-        <meshBasicMaterial
-          color="#ff4400"
-          transparent
-          opacity={0.4}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
+      {/* Outer flame – large, diffuse */}
+      <GradientFlameCone color="#ff4400" baseOpacity={0.45} radius={0.25} height={1.0} yOffset={-0.4} />
+      {/* Mid flame */}
+      <GradientFlameCone color="#ff8822" baseOpacity={0.6} radius={0.16} height={0.7} yOffset={-0.3} />
       {/* Inner core */}
-      <mesh position={[0, -0.3, 0]}>
-        <coneGeometry args={[0.10, 0.5, 32, 1, true]} />
-        <meshBasicMaterial
-          color="#ffdd66"
-          transparent
-          opacity={0.7}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
+      <GradientFlameCone color="#ffdd66" baseOpacity={0.75} radius={0.1} height={0.5} yOffset={-0.25} />
       {/* Brightest center */}
-      <mesh position={[0, -0.15, 0]}>
-        <coneGeometry args={[0.04, 0.2, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.9}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
+      <GradientFlameCone color="#ffffff" baseOpacity={0.9} radius={0.04} height={0.25} yOffset={-0.15} />
+
+      {/* Particle detail */}
+      <FlameParticles active={active} />
+
       {/* Dynamic light */}
       <pointLight ref={lightRef} position={[0, -0.3, 0]} color="#ff6600" intensity={2} distance={4} />
     </group>
+  );
+}
+
+// ─────────────────────────────────────────────
+// IgnitionSpark – fireball that travels from injector
+//    down to combustion chamber over 1 second
+// ─────────────────────────────────────────────
+
+function IgnitionSpark({ active }: { active: boolean }) {
+  const sparkRef = useRef<THREE.Mesh>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  useFrame((state) => {
+    if (!sparkRef.current) return;
+
+    if (!active) {
+      startTimeRef.current = null;
+      sparkRef.current.visible = false;
+      return;
+    }
+
+    if (startTimeRef.current === null) {
+      startTimeRef.current = state.clock.elapsedTime;
+    }
+
+    const elapsed = state.clock.elapsedTime - startTimeRef.current;
+
+    if (elapsed > 1.0) {
+      sparkRef.current.visible = false;
+      return;
+    }
+
+    sparkRef.current.visible = true;
+    const progress = elapsed / 1.0; // 0 → 1
+
+    // Move from injector (y=0.38) down to combustion chamber center (y=0)
+    sparkRef.current.position.y = 0.38 * (1 - progress);
+
+    // Shrink as it travels
+    const s = 0.08 * (1 - progress * 0.6);
+    sparkRef.current.scale.setScalar(s);
+
+    // Fade out in last 30 %
+    const mat = sparkRef.current.material as THREE.MeshBasicMaterial;
+    mat.opacity = progress < 0.7 ? 1.0 : 1.0 - (progress - 0.7) / 0.3;
+  });
+
+  return (
+    <mesh ref={sparkRef} position={[0, 0.38, 0]} visible={false}>
+      <sphereGeometry args={[1, 16, 16]} />
+      <meshBasicMaterial color="#ffffff" transparent opacity={1} />
+    </mesh>
   );
 }
 
@@ -254,6 +438,14 @@ export function MerlinEngine({
         />
       ))}
       <EngineFlame active={simulating} />
+      <IgnitionSpark active={simulating} />
+      {/* Simulated inner glow from combustion chamber visible through nozzle */}
+      {simulating && (
+        <pointLight position={[0, 0.3, 0]} color="#ff2200" intensity={1.5} distance={1.5} />
+      )}
+      {simulating && (
+        <pointLight position={[0, -0.6, 0]} color="#ff4400" intensity={0.8} distance={1.0} />
+      )}
     </group>
   );
 }
