@@ -114,12 +114,13 @@ function PartMesh({
           document.body.style.cursor = "default";
         }}
       >
-        <meshStandardMaterial
+        <meshPhysicalMaterial
           color={part.color}
           metalness={part.metalness}
           roughness={part.roughness}
           emissive={emissiveColor}
           emissiveIntensity={emissiveIntensity}
+          clearcoat={0.5}
           clippingPlanes={
             simulating && (part.id === "nozzle" || part.id === "combustion-chamber")
               ? [CLIP_PLANE]

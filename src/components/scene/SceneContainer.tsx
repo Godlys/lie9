@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { CameraControls, Environment } from "@react-three/drei";
+import { CameraControls, ContactShadows, Environment } from "@react-three/drei";
 import { StarField } from "./StarField";
 import { OverviewScene } from "./OverviewScene";
 import { OctawebScene } from "./OctawebScene";
@@ -31,6 +31,9 @@ function SceneContent({
       <directionalLight position={[5, 5, 5]} intensity={1.5} color="#ffffff" />
       <directionalLight position={[-5, 3, -5]} intensity={0.5} color="#4a6fa5" />
       <pointLight position={[0, -2, 0]} intensity={0.8} color="#ff3b30" distance={5} />
+      <pointLight position={[-3, 2, -3]} intensity={1.5} color="#ff3b30" distance={10} />
+
+      <ContactShadows resolution={512} scale={10} blur={2} opacity={0.5} far={10} color="#000000" position={[0, -2, 0]} />
 
       <StarField count={2000} />
 
