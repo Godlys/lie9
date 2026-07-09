@@ -88,7 +88,7 @@ export function SceneContainer({
   return (
     <Canvas
       dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true }}
+      gl={{ antialias: true, alpha: true, localClippingEnabled: true }}
       onPointerMissed={() => onSelectPart("")}
       camera={{ fov: 45, position: [0, 0, 4] }}
     >

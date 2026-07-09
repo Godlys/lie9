@@ -4,6 +4,9 @@ import * as THREE from "three";
 import { Html, Line } from "@react-three/drei";
 import type { EnginePart } from "../../data/rocketData";
 
+// Clipping plane for engine cutaway view during simulation
+const CLIP_PLANE = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+
 // ─────────────────────────────────────────────
 // PartMesh – individual engine part
 // ─────────────────────────────────────────────
@@ -116,6 +119,14 @@ function PartMesh({
           roughness={part.roughness}
           emissive={emissiveColor}
           emissiveIntensity={emissiveIntensity}
+          clippingPlanes={
+            simulating && (part.id === "nozzle" || part.id === "combustion-chamber")
+              ? [CLIP_PLANE]
+              : []
+          }
+          clipShadows={
+            simulating && (part.id === "nozzle" || part.id === "combustion-chamber")
+          }
         />
       </mesh>
       {/* Outline for selected */}
