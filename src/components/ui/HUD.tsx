@@ -22,6 +22,15 @@ export function HUD({ mode, info }: { mode: string; info?: string }) {
         </div>
       )}
 
+      {/* SCROLL TO EXPLORE (overview only) */}
+      {mode === "overview" && (
+        <div className="fixed bottom-10 left-1/2 z-20 -translate-x-1/2">
+          <span className="animate-breathe font-mono text-[11px] tracking-[0.25em] text-zinc-500">
+            SCROLL TO EXPLORE
+          </span>
+        </div>
+      )}
+
       {/* Brand bottom-right */}
       <div className="fixed bottom-6 right-6 z-20 text-right">
         <div className="font-mono text-xs font-bold tracking-[0.3em] text-zinc-700">

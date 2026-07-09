@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
+import gsap from "gsap";
 import { SceneContainer } from "./components/scene/SceneContainer";
 import { InfoPanel } from "./components/ui/InfoPanel";
 import { Breadcrumb } from "./components/ui/Breadcrumb";
@@ -27,12 +28,35 @@ export default function App() {
     toggleExplode,
   } = useSceneState();
 
-  const [cameraTransition, setCameraTransition] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevMode = useRef<SceneMode | null>(null);
 
   useEffect(() => {
-    setCameraTransition(true);
-    const t = setTimeout(() => setCameraTransition(false), 600);
-    return () => clearTimeout(t);
+    if (!containerRef.current) return;
+    // Skip animation on initial mount
+    if (prevMode.current === null) {
+      prevMode.current = mode;
+      return;
+    }
+    prevMode.current = mode;
+
+    const el = containerRef.current;
+    gsap.fromTo(
+      el,
+      { opacity: 1 },
+      {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power2.in",
+        onComplete: () => {
+          gsap.fromTo(
+            el,
+            { opacity: 0 },
+            { opacity: 1, duration: 0.3, ease: "power2.out" },
+          );
+        },
+      },
+    );
   }, [mode]);
 
   const handleNavigate = (target: SceneMode) => {
@@ -43,11 +67,10 @@ export default function App() {
 
   return (
     <div
+      ref={containerRef}
       className="relative h-screen w-screen overflow-hidden"
       style={{
         background: "radial-gradient(ellipse at center, #0f0f18 0%, #0a0a0f 60%, #050508 100%)",
-        opacity: cameraTransition ? 0.6 : 1,
-        transition: "opacity 600ms ease",
       }}
     >
       {loading && <LoadingScreen onDone={() => setLoading(false)} />}
