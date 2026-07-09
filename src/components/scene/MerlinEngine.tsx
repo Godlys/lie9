@@ -26,17 +26,17 @@ function PartMesh({
           64,
         );
       case "cylinder":
-        return new THREE.CylinderGeometry(0.04, 0.04, 0.12, 32);
+        return new THREE.CylinderGeometry(0.10, 0.10, 0.30, 32);
       case "torus":
-        return new THREE.TorusGeometry(0.08, 0.02, 16, 48);
+        return new THREE.TorusGeometry(0.20, 0.05, 16, 48);
       case "box":
-        return new THREE.BoxGeometry(0.06, 0.06, 0.06);
+        return new THREE.BoxGeometry(0.15, 0.15, 0.15);
       case "sphere":
-        return new THREE.SphereGeometry(0.05, 32, 24);
+        return new THREE.SphereGeometry(0.125, 32, 24);
       case "cone":
-        return new THREE.ConeGeometry(0.06, 0.1, 32);
+        return new THREE.ConeGeometry(0.15, 0.25, 32);
       default:
-        return new THREE.BoxGeometry(0.05, 0.05, 0.05);
+        return new THREE.BoxGeometry(0.125, 0.125, 0.125);
     }
   }, [part]);
 
@@ -79,11 +79,11 @@ function PartMesh({
       )}
       {/* Chinese label using Drei Html */}
       <Html
-        position={[0, 0.14, 0]}
+        position={[0, 0.35, 0]}
         center
         style={{
           color: selected ? "#ff3b30" : "#ffffff",
-          fontSize: "11px",
+          fontSize: "13px",
           fontWeight: "bold",
           whiteSpace: "nowrap",
           textShadow: "0 0 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)",

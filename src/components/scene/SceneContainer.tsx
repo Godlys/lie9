@@ -67,7 +67,7 @@ export function SceneContainer({
 }) {
   // Camera positions per mode
   const cameraPos: [number, number, number] =
-    mode === "overview" ? [0, 0, 4] : mode === "octaweb" ? [0.5, 0.5, 1.2] : [0.8, 0.3, 1.0];
+    mode === "overview" ? [0, 0, 4] : mode === "octaweb" ? [0.5, 0.5, 1.2] : [2.0, 0.75, 2.5];
 
   return (
     <Canvas
