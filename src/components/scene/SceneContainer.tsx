@@ -105,7 +105,7 @@ export function SceneContainer({
           onOverviewClick={onOverviewClick}
           onOctawebClick={onOctawebClick}
         />
-        <Environment preset="night" />
+        <Environment files="/hdri/dikhololo_night_1k.hdr" />
       </Suspense>
       <CameraControls
         ref={cameraRef}
